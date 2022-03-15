@@ -25,13 +25,10 @@ def json_validation_check(valid: tuple) -> bool:
 def unique_check(conn: Any, valid: tuple) -> Any:
     """Функция проверяет уникальность Id товара, подаваемого в json."""
     c = conn.cursor()
-    c.execute("""SELECT id FROM goods""")
-    kostil = c.fetchall()
-    for i in range(len(kostil)):
-        if valid["id"] == kostil[i][0]:
-            return "Товар с таким ID уже есть в базе данных. Отвергнуто."
-    else:
-        return True
+    c.execute(
+        f"""SELECT CASE WHEN count(*) != 0 THEN 'Товар с таким ID уже есть в базе данных. Отвергнуто.' ELSE 'True' \
+        END AS result FROM goods WHERE id = {valid["id"]}""")
+    return c.fetchall()[0][0]
 
 
 def create_table(conn: Any) -> None:
@@ -55,7 +52,7 @@ def insert_one(conn: Any, good_info: tuple) -> None:
             {good_info["package_params"]["depth"]});"""
     )
 
-    c.execute("""SELECT MAX(id) FROM packages""")  # пока так, потому что работает
+    c.execute("""SELECT MAX(id) FROM packages""")
     kostil = int((c.fetchall()[0][0]))
     c.execute(
         f"""INSERT INTO goods (id, name, package_id) VALUES ('{good_info["id"]}', '{good_info["name"]}', {kostil});"""
@@ -63,12 +60,10 @@ def insert_one(conn: Any, good_info: tuple) -> None:
 
     for i in range(len(good_info["location_and_quantity"])):
         c.execute(f"""INSERT INTO shops (address) VALUES ('{good_info["location_and_quantity"][i]["location"]}');""")
-        c.execute("""SELECT MAX(id) FROM goods""")  # пока так, потому что работает
+        c.execute("""SELECT MAX(id) FROM goods""")
         kostil = int((c.fetchall()[0][0]))
-        c.execute("""SELECT MAX(id) FROM shops""")  # пока так, потому что работает
+        c.execute("""SELECT MAX(id) FROM shops""")
         kostil_1 = int((c.fetchall()[0][0]))
-
-        # Возможно тут тоже нужен перебор в магазинах?
         c.execute(
             f"""INSERT INTO shops_goods (id_good, id_shop, amount) VALUES ({kostil}, {kostil_1}, \
                 '{good_info["location_and_quantity"][i]["amount"]}');""")
@@ -82,7 +77,7 @@ def main(file_name: str) -> None:
         with sqlite3.connect('TASK.db') as conn:
             create_table(conn)
             uni = unique_check(conn, json_parser(file_name))
-            if uni is True:
+            if uni == 'True':
                 insert_one(conn, json_parser(file_name))
                 return "Данные внесены."
             else:
